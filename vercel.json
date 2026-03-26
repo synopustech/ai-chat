@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/v1/:path*",
+      "destination": "https://api.synopustech.com/v1/:path*"
+    },
+    {
+      "source": "/search",
+      "destination": "https://search.synopustech.com/search"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://voice.synopustech.com/api/:path*"
+    }
+  ]
+}
