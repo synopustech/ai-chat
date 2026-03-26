@@ -130,6 +130,16 @@ input[type=range]{width:100%;accent-color:#3b82f6;cursor:pointer;height:4px;bord
 .btn-send:hover{background:#1d4ed8}
 .btn-send:disabled{opacity:.35;cursor:not-allowed}
 .input-hint{font-size:11px;color:#2a2a2a;text-align:center}
+#tts-loading-bar{display:none;align-items:center;gap:8px;padding:6px 16px 2px;font-size:12px;color:#3b82f6}
+#tts-loading-bar.visible{display:flex}
+#tts-loading-bar .tts-waves{display:flex;align-items:center;gap:2px}
+#tts-loading-bar .tts-waves span{display:block;width:3px;border-radius:2px;background:#3b82f6;animation:tts-wave 1s ease-in-out infinite}
+#tts-loading-bar .tts-waves span:nth-child(1){height:6px;animation-delay:0s}
+#tts-loading-bar .tts-waves span:nth-child(2){height:10px;animation-delay:.15s}
+#tts-loading-bar .tts-waves span:nth-child(3){height:14px;animation-delay:.3s}
+#tts-loading-bar .tts-waves span:nth-child(4){height:10px;animation-delay:.45s}
+#tts-loading-bar .tts-waves span:nth-child(5){height:6px;animation-delay:.6s}
+@keyframes tts-wave{0%,100%{transform:scaleY(1);opacity:.5}50%{transform:scaleY(1.6);opacity:1}}
 
 /* File picker sheet */
 .attach-sheet{display:none;position:fixed;inset:0;z-index:300;align-items:flex-end}
@@ -263,7 +273,7 @@ input[type=range]{width:100%;accent-color:#3b82f6;cursor:pointer;height:4px;bord
           Enable Thinking
           <span class="tip-wrap"><i class="tip-icon" data-tip="The model reasons step-by-step before answering. Disable for <strong>faster responses</strong> — best for simple questions. Enable for complex reasoning tasks.">?</i></span>
         </span>
-        <label class="toggle"><input type="checkbox" id="enable-thinking" checked><span class="tslider"></span></label>
+        <label class="toggle"><input type="checkbox" id="enable-thinking"><span class="tslider"></span></label>
       </div>
       <div class="toggle-row">
         <span class="toggle-label">
@@ -313,6 +323,10 @@ input[type=range]{width:100%;accent-color:#3b82f6;cursor:pointer;height:4px;bord
         <h2>Ask anything</h2>
         <p id="empty-model">Connecting to model…</p>
       </div>
+    </div>
+    <div id="tts-loading-bar">
+      <div class="tts-waves"><span></span><span></span><span></span><span></span><span></span></div>
+      <span id="tts-loading-label">Loading voice…</span>
     </div>
     <div class="input-area">
       <div class="file-preview" id="file-preview"></div>
@@ -709,6 +723,9 @@ async function playTTS(msgId) {
     return;
   }
   
+  const ttsBar = document.getElementById('tts-loading-bar');
+  const ttsLabel = document.getElementById('tts-loading-label');
+  if (ttsBar) { ttsLabel.textContent = 'Loading voice…'; ttsBar.classList.add('visible'); }
   if (btn) btn.classList.add('loading');
   try {
     console.log('TTS: Speaking response:', responseText.substring(0, 50) + '...');
@@ -726,9 +743,11 @@ async function playTTS(msgId) {
     src.connect(audioCtx.destination);
     _currentAudioSource = src;
     _currentAudioMsgId = msgId;
+    if (ttsBar) ttsLabel.textContent = 'Speaking…';
     if (btn) { btn.classList.remove('loading'); btn.classList.add('playing'); }
     src.onended = () => {
       if (btn) btn.classList.remove('playing');
+      if (ttsBar) ttsBar.classList.remove('visible');
       _currentAudioSource = null;
       _currentAudioMsgId = null;
     };
@@ -736,6 +755,7 @@ async function playTTS(msgId) {
   } catch (err) {
     console.error('TTS error:', err);
     if (btn) btn.classList.remove('loading', 'playing');
+    if (ttsBar) ttsBar.classList.remove('visible');
   }
 }
 
