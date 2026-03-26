@@ -1,7 +1,1 @@
-{
-  "rewrites": [
-    { "source": "/v1/:path*",  "destination": "/api/v1/:path*" },
-    { "source": "/search",     "destination": "/api/search" },
-    { "source": "/api/:path*", "destination": "/api/gateway/:path*" }
-  ]
-}
+{}

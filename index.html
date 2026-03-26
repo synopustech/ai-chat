@@ -447,7 +447,7 @@ function loadHistory() {
 
 (async () => {
   try {
-    const r = await fetch('/v1/models');
+    const r = await fetch('/api/v1/models');
     const j = await r.json();
     modelName = j.data?.[0]?.id ?? 'qwen3.5-27b';
     contextWindow = j.data?.[0]?.max_model_len ?? 32768;
@@ -523,7 +523,7 @@ function removeFile(i) { uploadedFiles.splice(i, 1); renderFilePreviews(); }
 async function performWebSearch(query) {
   try {
     // Route through nginx /search proxy so this works from any host
-    const response = await fetch(`/search?q=${encodeURIComponent(query)}`, {
+    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
     });
@@ -583,7 +583,7 @@ async function startRecording() {
       form.append('audio', blob, 'recording.webm');
       try {
         console.log('STT: Sending audio blob (' + blob.size + ' bytes)');
-        const r = await fetch('/api/transcribe', { method: 'POST', body: form });
+        const r = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
         if (!r.ok) {
           const errText = await r.text();
           throw new Error(`Server ${r.status}: ${errText}`);
@@ -694,7 +694,7 @@ async function playTTS(msgId) {
   if (btn) btn.classList.add('loading');
   try {
     console.log('TTS: Speaking response:', responseText.substring(0, 50) + '...');
-    const r = await fetch('/api/tts', {
+    const r = await fetch('/api/voice/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: responseText }),
@@ -945,7 +945,7 @@ async function sendMessage(fromVoice = false) {
   }
 
   try {
-    const resp = await fetch('/v1/chat/completions', {
+    const resp = await fetch('/api/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: modelName, messages, stream,

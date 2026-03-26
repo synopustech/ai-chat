@@ -1,5 +1,3 @@
 {
-  "dependencies": {
-    "@vercel/edge": "latest"
-  }
+  "type": "module"
 }
