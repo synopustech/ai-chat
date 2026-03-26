@@ -533,7 +533,7 @@ async function performWebSearch(query) {
     const data = await response.json();
     if (!data.success || !data.results || data.results.length === 0) {
       console.log('No search results found');
-      return '';
+      return { context: '', count: 0 };
     }
     
     // Format search results as context
@@ -546,10 +546,10 @@ async function performWebSearch(query) {
     }
     context += '\n--- End of Search Results ---\n';
     
-    return context;
+    return { context, count: data.results.length };
   } catch (err) {
     console.error('Web search error:', err);
-    return '';
+    return { context: '', count: 0, error: err.message };
   }
 }
 
@@ -830,7 +830,10 @@ function addUserMessage(text, files) {
   const div = document.createElement('div');
   div.className = 'message user';
   const chips = files.map(f => `<div class="file-chip"><svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${esc(f)}</div>`).join('');
-  div.innerHTML = `<div class="msg-role">You</div>${chips}<div class="msg-bubble">${esc(text).replace(/\n/g, '<br>') || '<em style="color:#aaa">Files attached</em>'}</div>`;
+  const searchBadge = (window._lastSearchCount > 0)
+    ? `<div style="font-size:10px;color:#3b82f6;opacity:.7;padding:0 4px;display:flex;align-items:center;gap:4px"><svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Searched · ${window._lastSearchCount} results</div>`
+    : '';
+  div.innerHTML = `<div class="msg-role">You</div>${chips}<div class="msg-bubble">${esc(text).replace(/\n/g, '<br>') || '<em style="color:#aaa">Files attached</em>'}</div>${searchBadge}`;
   msgs.appendChild(div); scrollBottom();
 }
 function addAssistantPlaceholder() {
@@ -868,8 +871,15 @@ async function sendMessage(fromVoice = false) {
     const div = addAssistantPlaceholder();
     div.innerHTML = '<div class="msg-role"><span class="spinner"></span></div><div style="padding:12px 16px;color:#666;font-size:13px">Searching the web...</div>';
     scrollBottom();
-    searchContext = await performWebSearch(text);
+    const searchResult = await performWebSearch(text);
+    searchContext = searchResult.context;
     div.remove();
+    if (searchResult.error) {
+      console.warn('Search failed:', searchResult.error);
+    }
+    window._lastSearchCount = searchResult.count;
+  } else {
+    window._lastSearchCount = 0;
   }
   
   if (uploadedFiles.length > 0) {
