@@ -1,11 +1,4 @@
-import { next } from '@vercel/edge';
-
-export default function middleware(request) {
-  return next({
-    headers: { 'x-vercel-auth': process.env.API_SECRET },
-  });
-}
-
-export const config = {
-  matcher: ['/v1/:path*', '/search', '/api/:path*'],
-};
+// Middleware is intentionally a no-op.
+// Auth header injection is handled by the Edge Function proxies in api/.
+export default function middleware() {}
+export const config = { matcher: [] };
