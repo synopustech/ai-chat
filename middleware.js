@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { next } from '@vercel/edge';
 
-export function middleware(request) {
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-vercel-auth', process.env.API_SECRET);
-  return NextResponse.next({ request: { headers: requestHeaders } });
+export default function middleware(request) {
+  return next({
+    headers: { 'x-vercel-auth': process.env.API_SECRET },
+  });
 }
 
 export const config = {
