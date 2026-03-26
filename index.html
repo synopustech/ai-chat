@@ -427,6 +427,25 @@ let contextWindow = 32768, autoMaxTokens = true, searchResults = [];
 let _msgIdCounter = 0;
 const _rawTexts = {};
 
+// ── Retry helper function ───────────────────────────────────────────────────────
+async function fetchWithRetry(url, options = {}, maxRetries = 3, delayMs = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.ok) return response;
+      // Don't retry on 4xx errors (client errors)
+      if (response.status >= 400 && response.status < 500) return response;
+      console.warn(`Request failed (attempt ${attempt}/${maxRetries}): ${response.status}`);
+    } catch (err) {
+      console.warn(`Request error (attempt ${attempt}/${maxRetries}): ${err.message}`);
+      if (attempt === maxRetries) throw err;
+    }
+    // Wait before retrying (with exponential backoff)
+    await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+  }
+  throw new Error('Max retries exceeded');
+}
+
 // ── localStorage persistence ──
 const LS_KEY = 'ai-chat-history';
 function saveHistory() {
@@ -461,14 +480,18 @@ function loadHistory() {
 
 (async () => {
   try {
-    const r = await fetch('/api/v1/models');
+    const r = await fetchWithRetry('/api/v1/models', {}, 3, 500);
     const j = await r.json();
     modelName = j.data?.[0]?.id ?? 'qwen3.5-27b';
     contextWindow = j.data?.[0]?.max_model_len ?? 32768;
     document.getElementById('model-name').textContent = modelName;
     document.getElementById('topbar-model').textContent = modelName;
     document.getElementById('empty-model').textContent = modelName + ' · local';
-  } catch { document.getElementById('model-name').textContent = 'offline'; }
+  } catch {
+    document.getElementById('model-name').textContent = 'offline';
+    document.getElementById('topbar-model').textContent = 'offline';
+    document.getElementById('empty-model').textContent = 'Model unavailable';
+  }
 })();
 
 function bindSlider(id, did, dec) {
@@ -537,10 +560,10 @@ function removeFile(i) { uploadedFiles.splice(i, 1); renderFilePreviews(); }
 async function performWebSearch(query) {
   try {
     // Route through nginx /search proxy so this works from any host
-    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+    const response = await fetchWithRetry(`/api/search?q=${encodeURIComponent(query)}`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
-    });
+    }, 3, 1000);
     
     if (!response.ok) throw new Error(`Search failed: ${response.status}`);
     
@@ -598,7 +621,7 @@ async function startRecording() {
       form.append('audio', blob, 'recording.webm');
       try {
         console.log('STT: Sending audio blob (' + blob.size + ' bytes)');
-        const r = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
+        const r = await fetchWithRetry('/api/voice/transcribe', { method: 'POST', body: form }, 3, 1000);
         if (!r.ok) {
           const errText = await r.text();
           throw new Error(`Server ${r.status}: ${errText}`);
@@ -729,11 +752,11 @@ async function playTTS(msgId) {
   if (btn) btn.classList.add('loading');
   try {
     console.log('TTS: Speaking response:', responseText.substring(0, 50) + '...');
-    const r = await fetch('/api/voice/tts', {
+    const r = await fetchWithRetry('/api/voice/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: responseText }),
-    });
+    }, 3, 1000);
     if (!r.ok) throw new Error(`TTS ${r.status}`);
     const arrayBuf = await r.arrayBuffer();
     const audioCtx = _getAudioCtx();
@@ -987,14 +1010,14 @@ async function sendMessage(fromVoice = false) {
   }
 
   try {
-    const resp = await fetch('/api/v1/chat/completions', {
+    const resp = await fetchWithRetry('/api/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: modelName, messages, stream,
         temperature: params.temperature, max_tokens: params.max_tokens,
         top_p: params.top_p, top_k: params.top_k,
         chat_template_kwargs: { enable_thinking: enableThinking } }),
-    });
+    }, 3, 1000);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
 
     if (stream) {
