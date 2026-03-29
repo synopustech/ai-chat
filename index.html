@@ -631,13 +631,18 @@ function loadHistory() {
     const j = await r.json();
     modelName = j.data?.[0]?.id ?? 'AI Chat LLM';
     contextWindow = j.data?.[0]?.max_model_len ?? 32768;
+    
     document.getElementById('model-name').textContent = modelName;
     document.getElementById('topbar-model').textContent = modelName;
-    document.getElementById('empty-model').textContent = modelName + ' · local';
+    
+    const emptyModelEl = document.getElementById('empty-model');
+    if (emptyModelEl) emptyModelEl.textContent = modelName + ' · local';
   } catch {
     document.getElementById('model-name').textContent = 'offline';
     document.getElementById('topbar-model').textContent = 'offline';
-    document.getElementById('empty-model').textContent = 'Model unavailable';
+    
+    const emptyModelEl = document.getElementById('empty-model');
+    if (emptyModelEl) emptyModelEl.textContent = 'Model unavailable';
   }
 })();
 
