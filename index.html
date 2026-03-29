@@ -538,9 +538,12 @@ function renderConversations() {
 
 function renderMessagesFromConversation() {
   const container = document.getElementById('messages');
+  // Remove only the empty state, keep chat-overlay
   const emptyState = document.getElementById('empty-state');
   if (emptyState) emptyState.remove();
-  container.innerHTML = '';
+  // Clear existing messages but keep chat-overlay
+  const existingMessages = container.querySelectorAll('.message');
+  existingMessages.forEach(msg => msg.remove());
   for (const msg of conversation) {
     if (msg.role === 'user') {
       const div = document.createElement('div');
@@ -566,7 +569,8 @@ function newConversation() {
   conversation = [];
   uploadedFiles = [];
   renderFilePreviews();
-  document.getElementById('messages').innerHTML = `<div class="empty-state" id="empty-state"><h2>Ask anything</h2><p>${esc(modelName)} · local</p></div>`;
+  const emptyStateHtml = `<div class="empty-state" id="empty-state"><h2>Ask anything</h2><p>${esc(modelName)} · local</p></div><div id="chat-overlay"><div class="big-spinner"></div></div>`;
+  document.getElementById('messages').innerHTML = emptyStateHtml;
   renderConversations();
 }
 
@@ -953,7 +957,8 @@ function clearChat() {
   conversation = []; uploadedFiles = []; renderFilePreviews();
   try { localStorage.removeItem(LS_KEY); } catch {}
   saveCurrentConversation();
-  document.getElementById('messages').innerHTML = `<div class="empty-state" id="empty-state"><h2>Ask anything</h2><p>${esc(modelName)} · local</p></div>`;
+  const emptyStateHtml = `<div class="empty-state" id="empty-state"><h2>Ask anything</h2><p>${esc(modelName)} · local</p></div><div id="chat-overlay"><div class="big-spinner"></div></div>`;
+  document.getElementById('messages').innerHTML = emptyStateHtml;
 }
 
 function renderMarkdown(text) {
@@ -1081,6 +1086,12 @@ async function sendMessage(fromVoice = false) {
   const text = input.value.trim();
   if (!text && uploadedFiles.length === 0) return;
   if (isStreaming) return;
+  
+  // Auto-create new conversation if none exists
+  if (!currentConvId) {
+    newConversation();
+  }
+  
   unlockAudio();
 
   let content;
@@ -1150,7 +1161,8 @@ async function sendMessage(fromVoice = false) {
   conversation.push({ role: 'user', content });
 
   const div = addAssistantPlaceholder();
-  document.getElementById('chat-overlay').classList.add('active');
+  const overlay = document.getElementById('chat-overlay');
+  if (overlay) overlay.classList.add('active');
   isStreaming = true; document.getElementById('send-btn').disabled = true;
   let fullText = '', reasoningText = '', overlayHidden = false;
   const params = getParams();
@@ -1161,7 +1173,8 @@ async function sendMessage(fromVoice = false) {
   function hideOverlay() {
     if (!overlayHidden) {
       overlayHidden = true;
-      document.getElementById('chat-overlay').classList.remove('active');
+      const overlay = document.getElementById('chat-overlay');
+      if (overlay) overlay.classList.remove('active');
     }
   }
 
