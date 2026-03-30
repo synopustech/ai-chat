@@ -742,6 +742,11 @@ function loadHistory() {
     
     const emptyModelEl = document.getElementById('empty-model');
     if (emptyModelEl) emptyModelEl.textContent = modelName + ' · local';
+    
+    // Update context window display
+    const valEl = document.getElementById('context-window-val');
+    if (valEl) valEl.textContent = cw;
+    updateContextWindow();
   } catch {
     document.getElementById('model-name').textContent = 'offline';
     document.getElementById('topbar-model').textContent = 'offline';
