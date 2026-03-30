@@ -48,6 +48,14 @@ input[type=range]{width:100%;accent-color:#3b82f6;cursor:pointer;height:4px;bord
 .clear-btn{background:#161616;border:1px solid #222;color:#666;padding:9px;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s;margin-top:auto}
 .clear-btn:hover{border-color:#7f1d1d;color:#ef4444}
 
+/* Context Window Display */
+.context-window-bar{transition:width .3s}
+.context-window-bar.warning{background:#f59e0b}
+.context-window-bar.danger{background:#ef4444}
+.compression-btn{display:flex;align-items:center;gap:8px;background:#1e1e1e;border:1px solid #2a2a2a;color:#ddd;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s}
+.compression-btn:hover{background:#2a2a2a;border-color:#3b82f6;color:#fff}
+.compression-btn:active{transform:scale(0.98)}
+
 /* Main */
 .main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
 .messages{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:28px 24px;display:flex;flex-direction:column;gap:24px;scroll-behavior:smooth}
@@ -249,6 +257,30 @@ input[type=range]{width:100%;accent-color:#3b82f6;cursor:pointer;height:4px;bord
 
     <div class="param-group">
       <div class="param-label">
+        Context Window
+        <span class="tip-wrap"><i class="tip-icon" data-tip="Total context window available for this model. Current usage shows how many tokens are being used by your conversation.">?</i></span>
+        <span class="val" id="context-window-val">32768</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <div style="flex:1;height:8px;background:#161616;border-radius:4px;overflow:hidden">
+          <div id="context-window-bar" style="width:0%;height:100%;background:#3b82f6;transition:width .3s"></div>
+        </div>
+        <span id="context-window-percent" style="font-size:11px;color:#666">0%</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="compressConversation()" style="flex:1;background:#1e1e1e;border:1px solid #2a2a2a;color:#ddd;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s">
+          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9 9 9 0 00-9 9 9 9 0 009 9z"/><path d="M9 12l2 2 4-4"/></svg>
+          Compress
+        </button>
+        <button onclick="clearChat()" style="background:#1c0a0a;border:1px solid #7f1d1d;color:#fca5a5;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer">
+          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          Clear
+        </button>
+      </div>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
         Temperature
         <span class="tip-wrap"><i class="tip-icon" data-tip="Controls creativity. <strong>0</strong> = focused &amp; factual. <strong>0.7</strong> = balanced (recommended). <strong>1.5+</strong> = very creative but may ramble.">?</i></span>
         <span class="val" id="temp-val">0.7</span>
@@ -302,6 +334,14 @@ input[type=range]{width:100%;accent-color:#3b82f6;cursor:pointer;height:4px;bord
           <span class="tip-wrap"><i class="tip-icon" data-tip="The model reasons step-by-step before answering. Disable for <strong>faster responses</strong> — best for simple questions. Enable for complex reasoning tasks.">?</i></span>
         </span>
         <label class="toggle"><input type="checkbox" id="enable-thinking"><span class="tslider"></span></label>
+      </div>
+      <div class="param-group" style="margin-top:8px">
+        <div class="param-label">
+          Max Thinking Steps
+          <span class="tip-wrap"><i class="tip-icon" data-tip="Maximum number of reasoning steps the model can take. Lower values prevent infinite loops. <strong>8</strong> is recommended for most cases.">?</i></span>
+          <span class="val" id="max-thinking-steps-val">8</span>
+        </div>
+        <input type="range" id="max-thinking-steps" min="1" max="20" step="1" value="8">
       </div>
       <div class="toggle-row">
         <span class="toggle-label">
@@ -454,6 +494,58 @@ let conversation = [], uploadedFiles = [], isStreaming = false, modelName = '';
 let contextWindow = 32768, autoMaxTokens = true, searchResults = [];
 let _msgIdCounter = 0;
 const _rawTexts = {};
+
+// ── Token Window Display ──
+function updateContextWindow() {
+  const usedTokens = conversation.reduce((s, m) => s + estimateTokens(typeof m.content === 'string' ? m.content : '') + 8, 0) + 32;
+  const percent = Math.min(100, Math.round((usedTokens / contextWindow) * 100));
+  const bar = document.getElementById('context-window-bar');
+  const percentEl = document.getElementById('context-window-percent');
+  const valEl = document.getElementById('context-window-val');
+  
+  if (bar && percentEl && valEl) {
+    bar.style.width = percent + '%';
+    percentEl.textContent = percent + '%';
+    valEl.textContent = contextWindow;
+    
+    // Color based on usage
+    bar.className = 'context-window-bar ' + (percent >= 90 ? 'danger' : percent >= 80 ? 'warning' : '');
+    
+    // Auto-compress if over 90%
+    if (percent >= 90 && conversation.length > 2) {
+      compressConversation();
+    }
+  }
+}
+
+// ── Conversation Compression ──
+function compressConversation() {
+  if (conversation.length <= 2) {
+    alert('Conversation is already minimal. Nothing to compress.');
+    return;
+  }
+  
+  // Keep system prompt and last 2 messages
+  const systemMsg = conversation.find(m => m.role === 'system');
+  const lastUser = [...conversation].reverse().find(m => m.role === 'user');
+  const lastAssistant = conversation.find(m => m.role === 'assistant' && conversation.indexOf(m) > conversation.indexOf(lastUser));
+  
+  const compressed = [];
+  if (systemMsg) compressed.push(systemMsg);
+  if (lastUser && lastAssistant) {
+    compressed.push(lastUser);
+    compressed.push(lastAssistant);
+  } else if (lastUser) {
+    compressed.push(lastUser);
+  }
+  
+  if (confirm('Compress conversation to last ' + (compressed.length - (systemMsg ? 1 : 0)) + ' messages?')) {
+    conversation = compressed;
+    renderMessagesFromConversation();
+    updateContextWindow();
+    saveCurrentConversation();
+  }
+}
 
 // ── Conversation management ──
 const CONV_STORAGE_KEY = 'ai-chat-conversations';
@@ -622,6 +714,7 @@ function loadHistory() {
       container.appendChild(div);
     }
     scrollBottom();
+    updateContextWindow();
   } catch {}
 }
 
@@ -679,6 +772,8 @@ function getParams() {
     max_tokens: parseInt(document.getElementById('max-tokens').value),
     top_p: parseFloat(document.getElementById('top-p').value),
     top_k: parseInt(document.getElementById('top-k').value),
+    // --- INFINITE REASONING LOOP FIX ---
+    max_thinking_steps: parseInt(document.getElementById('max-thinking-steps').value),
   };
 }
 
@@ -1224,6 +1319,7 @@ async function sendMessage(fromVoice = false) {
       const combined = reasoningText ? `<think>${reasoningText}</think>${fullText}` : fullText;
       updateAssistant(div, combined, false);
       conversation.push({ role: 'assistant', content: combined });
+      updateContextWindow();
       saveCurrentConversation();
       if ((fromVoice || document.getElementById('auto-tts').checked) && combined) {
         playTTS(div.dataset.msgId);
@@ -1237,6 +1333,7 @@ async function sendMessage(fromVoice = false) {
       const combined = reasoningText ? `<think>${reasoningText}</think>${fullText}` : fullText;
       updateAssistant(div, combined, false);
       conversation.push({ role: 'assistant', content: combined });
+      updateContextWindow();
       saveCurrentConversation();
       if ((fromVoice || document.getElementById('auto-tts').checked) && combined) {
         playTTS(div.dataset.msgId);
@@ -1245,6 +1342,7 @@ async function sendMessage(fromVoice = false) {
   } catch (err) {
     div.innerHTML = `<div class="msg-role" style="color:#ef4444">Error</div><div class="msg-bubble" style="background:#1c0a0a;border-color:#7f1d1d;color:#fca5a5">${esc(String(err))}</div>`;
     conversation.pop();
+    updateContextWindow();
     saveCurrentConversation();
   } finally {
     hideOverlay();
@@ -1255,6 +1353,11 @@ async function sendMessage(fromVoice = false) {
 // Initialize conversations list on load
 renderConversations();
 loadHistory();
+
+// --- INFINITE REASONING LOOP FIX: Add event listener for max-thinking-steps slider ---
+document.getElementById('max-thinking-steps').addEventListener('input', function() {
+  document.getElementById('max-thinking-steps-val').textContent = this.value;
+});
 </script>
 </body>
 </html>
