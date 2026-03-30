@@ -723,7 +723,19 @@ function loadHistory() {
     const r = await fetchWithRetry('/api/v1/models', {}, 3, 500);
     const j = await r.json();
     modelName = j.data?.[0]?.id ?? 'AI Chat LLM';
-    contextWindow = j.data?.[0]?.max_model_len ?? 32768;
+    
+    // Get context window from API response, with fallbacks
+    let cw = j.data?.[0]?.max_model_len;
+    if (!cw) {
+      // Fallback based on model name patterns
+      const name = modelName.toLowerCase();
+      if (name.includes('122b') || name.includes('qwen3.5-122b')) cw = 131072;
+      else if (name.includes('27b') || name.includes('qwen3.5-27b')) cw = 65536;
+      else if (name.includes('9b') || name.includes('qwen3.5-9b')) cw = 32768;
+      else if (name.includes('coder') || name.includes('qwen-coder')) cw = 131072;
+      else cw = 32768; // Default
+    }
+    contextWindow = cw;
     
     document.getElementById('model-name').textContent = modelName;
     document.getElementById('topbar-model').textContent = modelName;
