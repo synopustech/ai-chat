@@ -729,7 +729,8 @@ function loadHistory() {
     if (!cw) {
       // Fallback based on model name patterns
       const name = modelName.toLowerCase();
-      if (name.includes('122b') || name.includes('qwen3.5-122b')) cw = 131072;
+      if (name.includes('gemma-4') || name.includes('gemma4')) cw = 32768;
+      else if (name.includes('122b') || name.includes('qwen3.5-122b')) cw = 131072;
       else if (name.includes('27b') || name.includes('qwen3.5-27b')) cw = 65536;
       else if (name.includes('9b') || name.includes('qwen3.5-9b')) cw = 32768;
       else if (name.includes('coder') || name.includes('qwen-coder')) cw = 131072;
@@ -777,8 +778,17 @@ document.getElementById('auto-max-tokens').addEventListener('change', function()
 });
 
 function estimateTokens(text) { return Math.ceil((text || '').length / 3); }
+function estimateMessageTokens(msg) {
+  if (typeof msg.content === 'string') return estimateTokens(msg.content) + 8;
+  let t = 8;
+  for (const part of msg.content) {
+    if (part.type === 'text') t += estimateTokens(part.text);
+    else if (part.type === 'image_url') t += 1024;
+  }
+  return t;
+}
 function computeAutoMaxTokens(msgs) {
-  const used = msgs.reduce((s, m) => s + estimateTokens(typeof m.content === 'string' ? m.content : '') + 8, 0) + 32;
+  const used = msgs.reduce((s, m) => s + estimateMessageTokens(m), 0) + 32;
   const safe = Math.floor((contextWindow - used) * 0.97) - 512;
   return Math.max(512, Math.min(safe, contextWindow - used - 512));
 }
